@@ -1,4 +1,4 @@
-# ArduinoWatchDog
+# Arduino meets 007
 Wie üblich brauche ich mal wieder was zum Anfassen beim Lernen neuer Dinge. Darum auch dieses kleine Projekt für einen Arduino Uno R3.
 
 Für die erste Ausbaustufe geht es erst einmal nur um die Software für so eine Art Alarmanlage - wer erinnert sich nicht an James Bond,
