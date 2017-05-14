@@ -81,8 +81,6 @@ void blinkStart() {
 */
 
 void setup() {
-    badAuth = millis() + AUTH_ON;
-
     // LED Ring initialisieren.
     pixels.begin();
 }
