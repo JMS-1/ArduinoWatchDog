@@ -21,7 +21,6 @@ ledDisplayMode ledMode = LED_INIT;
 #define START_OFF   200
 #define AUTH_ON     2500
 
-bool authOn = false;
 int ledStart = -1;
 int badAuth = -1;
 
