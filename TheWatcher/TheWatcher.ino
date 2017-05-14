@@ -1,33 +1,45 @@
+#include <SPI.h>
+#include <MFRC522.h>
 #include <Adafruit_NeoPixel.h>
+
 #ifdef __AVR__
 #include <avr/power.h>
 #endif
 
-// Konfiguration des LED Rings
+// Konfiguration des LED Rings.
 #define LED_CONTROL     8
 #define LED_COUNT       16
 
 Adafruit_NeoPixel pixels = Adafruit_NeoPixel(LED_COUNT, LED_CONTROL, NEO_GRB + NEO_KHZ800);
 
+// Konfiguration des RFID Empfängers.
+#define RFID_SDA        10
+#define RFID_RST        9
+
+MFRC522 mfrc522(RFID_SDA, RFID_RST);
+
 /*
     LED Anzeige.
 */
 
-typedef enum { LED_INIT = -1, LED_OFF, LED_START_ON, LED_START_OFF } ledDisplayMode;
+typedef enum { LED_OFF, LED_START_ON, LED_START_OFF, LED_HOT } ledDisplayMode;
 
-ledDisplayMode ledMode = LED_INIT;
+ledDisplayMode ledMode = LED_OFF;
 
 #define START_ON    500
 #define START_OFF   200
+#define START_DELAY 5000
 #define AUTH_ON     2500
 
-int ledStart = -1;
-int badAuth = -1;
+long ledHot = -1;
+long badAuth = -1;
+long ledStart = -1;
+auto hasBadAuth = false;
 
 // Einfarbige Anzeige.
 void singleColor(uint8_t r, uint8_t g, uint8_t b) {
     // Ring in der gewünschten Farbe vorbereiten.
-    for (int i = 0; i < LED_COUNT; i++)
+    for (auto i = 0; i < LED_COUNT; i++)
         pixels.setPixelColor(i, pixels.Color(r, g, b));
 
     // LED Ring anzeigen.
@@ -35,10 +47,10 @@ void singleColor(uint8_t r, uint8_t g, uint8_t b) {
 }
 
 // Anzeige ändern.
-void setDisplay(ledDisplayMode mode);
-void setDisplay(ledDisplayMode mode) {
+void setDisplay(ledDisplayMode mode, bool force = false);
+void setDisplay(ledDisplayMode mode, bool force = false) {
     // Keine Änderung.
-    if (mode == ledMode)
+    if ((mode == ledMode) && !force)
         return;
 
     // Einige Anzeigen blinken.
@@ -56,21 +68,117 @@ void setDisplay(ledDisplayMode mode) {
     case LED_START_OFF:
         singleColor(0, 16, 0);
         break;
+    case LED_HOT:
+        singleColor(16, 0, 0);
+        break;
     }
 }
 
 // Bearbeitet die Startwarnung.
 void blinkStart() {
-    int now = millis();
+    auto now = millis();
 
-    switch (ledMode) {
+    // Startwarnung geben und nach Ablauf scharf schalten.
+    switch (ledMode)
+    {
     case LED_START_ON:
-        if (now >= (ledStart + START_ON))
+        if (now >= ledHot)
+            setDisplay(LED_HOT);
+        else if (now >= (ledStart + START_ON))
             setDisplay(LED_START_OFF);
         break;
     case LED_START_OFF:
-        if (now >= (ledStart + START_OFF))
+        if (now >= ledHot)
+            setDisplay(LED_HOT);
+        else if (now >= (ledStart + START_OFF))
             setDisplay(LED_START_ON);
+        break;
+    }
+}
+
+/*
+    RFID Empfänger.
+*/
+
+#define READ_TAG_DELAY  500
+
+typedef enum { RFID_BADTAG = -1, RFID_NOTAG, RFID_GOODTAG } rfidTagResult;
+
+auto lastTag = RFID_NOTAG;
+auto firstReadTag = true;
+long nextReadTag = -1;
+
+// Prüft of ein RFID Tag in der Nähe ist.
+rfidTagResult readTag();
+rfidTagResult readTag() {
+    // Auslesen initialisieren.
+    if (firstReadTag) {
+        firstReadTag = false;
+        nextReadTag = millis();
+    }
+
+    // Glitches vermeiden.
+    auto now = millis();
+
+    if (now < nextReadTag)
+        return RFID_NOTAG;
+
+    // Auf Karte prüfen.
+    if (!mfrc522.PICC_IsNewCardPresent())
+        return RFID_NOTAG;
+
+    if (!mfrc522.PICC_ReadCardSerial())
+        return RFID_NOTAG;
+
+    // Nächste Prüfung erst wieder nach einer gewissen Zeit erlauben.
+    nextReadTag = now + READ_TAG_DELAY;
+
+    // RFID Kennung (UID) prüfen.
+    if (mfrc522.uid.size != 4)
+        return RFID_BADTAG;
+    if (mfrc522.uid.uidByte[0] != 84)
+        return RFID_BADTAG;
+    if (mfrc522.uid.uidByte[1] != 189)
+        return RFID_BADTAG;
+    if (mfrc522.uid.uidByte[2] != 158)
+        return RFID_BADTAG;
+    if (mfrc522.uid.uidByte[3] != 187)
+        return RFID_BADTAG;
+
+    return RFID_GOODTAG;
+}
+
+void processTag() {
+    // Neu einlesen.
+    auto tagInfo = readTag();
+
+    if (tagInfo == lastTag)
+        return;
+
+    // Ergebnis auswerten.
+    switch (lastTag = tagInfo)
+    {
+    case RFID_GOODTAG:
+        switch (ledMode)
+        {
+        case LED_OFF:
+            // Startwarnung anwerfen.
+            ledHot = millis() + START_DELAY;
+            setDisplay(LED_START_ON);
+            break;
+        case LED_START_ON:
+        case LED_START_OFF:
+            break;
+        default:
+            // In den Ruhezustand wechseln.
+            setDisplay(LED_OFF);
+            break;
+        }
+        break;
+    case RFID_BADTAG:
+        // Falsches Tag melden.
+        hasBadAuth = true;
+        badAuth = millis() + AUTH_ON;
         break;
     }
 }
@@ -82,18 +190,35 @@ void blinkStart() {
 void setup() {
     // LED Ring initialisieren.
     pixels.begin();
+
+    // SPI initialisieren.
+    SPI.begin();
+
+    // RFID Empfänger initialisieren.
+    mfrc522.PCD_Init();
+
+    // Initiale Anzeige setzen.
+    setDisplay(LED_OFF, true);
 }
 
 void loop() {
-    if (ledStart == LED_INIT)
-        setDisplay(LED_START_ON);
+    // RFID einlesen und entsprechend reagieren.
+    processTag();
 
     // RFID Warnung hat Vorrang.
-    if (millis() <= badAuth) {
-        // Wir setzen einfach immer die Farbe - eigentlich könnten wir uns das auch merken aber für die paar Sekunden.
-        singleColor(255, 255, 0);
+    if (hasBadAuth) {
+        if (millis() > badAuth) {
+            hasBadAuth = false;
 
-        return;
+            // Aktuellen Zustand wieder herstellen.
+            setDisplay(ledMode, true);
+        }
+        else {
+            // Wir setzen einfach immer die Farbe - eigentlich könnten wir uns das auch merken aber für die paar Sekunden...
+            singleColor(128, 128, 0);
+
+            return;
+        }
     }
 
     // Wechselnde Anzeigen darstellen.
