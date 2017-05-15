@@ -10,7 +10,7 @@
 #define LED_CONTROL     8
 #define LED_COUNT       16
 
-Adafruit_NeoPixel pixels = Adafruit_NeoPixel(LED_COUNT, LED_CONTROL, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel leds = Adafruit_NeoPixel(LED_COUNT, LED_CONTROL, NEO_GRB + NEO_KHZ800);
 
 // Konfiguration des RFID Empfängers.
 #define RFID_SDA        10
@@ -22,7 +22,7 @@ MFRC522 mfrc522(RFID_SDA, RFID_RST);
     LED Anzeige.
 */
 
-typedef enum { LED_OFF, LED_START_ON, LED_START_OFF, LED_HOT } ledDisplayMode;
+typedef enum { LED_OFF, LED_START_ON, LED_START_OFF, LED_HOT, LED_DETECTED } ledDisplayMode;
 
 ledDisplayMode ledMode = LED_OFF;
 
@@ -34,16 +34,17 @@ ledDisplayMode ledMode = LED_OFF;
 long ledHot = -1;
 long badAuth = -1;
 long ledStart = -1;
+auto lastCenter = -1;
 auto hasBadAuth = false;
 
 // Einfarbige Anzeige.
 void singleColor(uint8_t r, uint8_t g, uint8_t b) {
     // Ring in der gewünschten Farbe vorbereiten.
     for (auto i = 0; i < LED_COUNT; i++)
-        pixels.setPixelColor(i, pixels.Color(r, g, b));
+        leds.setPixelColor(i, leds.Color(r, g, b));
 
     // LED Ring anzeigen.
-    pixels.show();
+    leds.show();
 }
 
 // Anzeige ändern.
@@ -71,6 +72,9 @@ void setDisplay(ledDisplayMode mode, bool force = false) {
     case LED_HOT:
         singleColor(16, 0, 0);
         break;
+    case LED_DETECTED:
+        lastCenter = -1;
+        break;
     }
 }
 
@@ -94,6 +98,61 @@ void blinkStart() {
             setDisplay(LED_START_ON);
         break;
     }
+}
+
+// Bearbeitet die Anzeige der Meldung.
+
+void rotate() {
+    // Das sind wir nicht
+    if (ledMode != LED_DETECTED)
+        return;
+
+    // Relative Position ermitteln.
+    auto now = millis();
+    auto done = now - ledStart;
+    long center = (done / 75) % LED_COUNT;
+
+    // Ein bißchen optimieren.
+    if (center == lastCenter)
+        return;
+
+    lastCenter = center;
+
+    // Anzeige setzen.
+    for (long i = 0; i < LED_COUNT; i++)
+    {
+        // Distanz vom Zentrum.
+        auto dist = abs(i - center);
+
+        if (dist > LED_COUNT / 2)
+            dist = LED_COUNT - dist;
+
+        // Anzeige erstellen.
+        switch (dist)
+        {
+        case 0:
+            leds.setPixelColor(i, 128, 0, 0);
+            break;
+        case 1:
+            leds.setPixelColor(i, 32, 0, 0);
+            break;
+        case 2:
+            leds.setPixelColor(i, 8, 0, 0);
+            break;
+        case 3:
+            leds.setPixelColor(i, 4, 0, 0);
+            break;
+        case 4:
+            leds.setPixelColor(i, 2, 0, 0);
+            break;
+        default:
+            leds.setPixelColor(i, 1, 0, 0);
+            break;
+        }
+    }
+
+    // Anzeigen.
+    leds.show();
 }
 
 /*
@@ -189,7 +248,7 @@ void processTag() {
 
 void setup() {
     // LED Ring initialisieren.
-    pixels.begin();
+    leds.begin();
 
     // SPI initialisieren.
     SPI.begin();
@@ -223,5 +282,6 @@ void loop() {
 
     // Wechselnde Anzeigen darstellen.
     blinkStart();
+    rotate();
 }
 
