@@ -18,11 +18,14 @@ Adafruit_NeoPixel leds = Adafruit_NeoPixel(LED_COUNT, LED_CONTROL, NEO_GRB + NEO
 
 MFRC522 mfrc522(RFID_SDA, RFID_RST);
 
+// Konfiguration des Bewegungsmelders.
+#define MOVE_PIN        7
+
 /*
     LED Anzeige.
 */
 
-typedef enum { LED_OFF, LED_START_ON, LED_START_OFF, LED_HOT, LED_DETECTED } ledDisplayMode;
+typedef enum { LED_OFF, LED_START_ON, LED_START_OFF, LED_HOT, LED_WARN, LED_DETECTED } ledDisplayMode;
 
 ledDisplayMode ledMode = LED_OFF;
 
@@ -30,11 +33,12 @@ ledDisplayMode ledMode = LED_OFF;
 #define START_OFF   200
 #define START_DELAY 5000
 #define AUTH_ON     2500
+#define WARN_ON     10000
 
 long ledHot = -1;
 long badAuth = -1;
 long ledStart = -1;
-auto lastCenter = -1;
+auto lastDynamic = -1;
 auto hasBadAuth = false;
 
 // Einfarbige Anzeige.
@@ -72,8 +76,9 @@ void setDisplay(ledDisplayMode mode, bool force = false) {
     case LED_HOT:
         singleColor(16, 0, 0);
         break;
+    case LED_WARN:
     case LED_DETECTED:
-        lastCenter = -1;
+        lastDynamic = -1;
         break;
     }
 }
@@ -113,10 +118,10 @@ void rotate() {
     long center = (done / 75) % LED_COUNT;
 
     // Ein biﬂchen optimieren.
-    if (center == lastCenter)
+    if (center == lastDynamic)
         return;
 
-    lastCenter = center;
+    lastDynamic = center;
 
     // Anzeige setzen.
     for (long i = 0; i < LED_COUNT; i++)
@@ -153,6 +158,22 @@ void rotate() {
 
     // Anzeigen.
     leds.show();
+}
+
+void glow() {
+    // Das sind wir nicht
+    if (ledMode != LED_WARN)
+        return;
+
+    // Relative Position ermitteln.
+    auto now = millis();
+    auto done = now - ledStart;
+
+    // Anzeigen
+    if (done >= WARN_ON)
+        setDisplay(LED_DETECTED);
+    else
+        singleColor((done / 6) % 128, 0, 0);
 }
 
 /*
@@ -256,6 +277,9 @@ void setup() {
     // RFID Empf‰nger initialisieren.
     mfrc522.PCD_Init();
 
+    // Bewegungsmelder initialisieren.
+    pinMode(MOVE_PIN, INPUT);
+
     // Initiale Anzeige setzen.
     setDisplay(LED_OFF, true);
 }
@@ -280,8 +304,14 @@ void loop() {
         }
     }
 
+    // Wir sind scharf.
+    if (ledMode == LED_HOT)
+        if (digitalRead(MOVE_PIN) == HIGH)
+            setDisplay(LED_WARN);
+
     // Wechselnde Anzeigen darstellen.
     blinkStart();
+    glow();
     rotate();
 }
 
