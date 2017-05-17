@@ -1,5 +1,6 @@
 #include <SPI.h>
 #include <MFRC522.h>
+#include <IRremote.h>
 #include <Adafruit_NeoPixel.h>
 
 #ifdef __AVR__
@@ -23,6 +24,18 @@ MFRC522 mfrc522(RFID_SDA, RFID_RST);
 
 // Konfiguration der Helligkeitssteuerung.
 #define POTI_PIN        A0
+
+// Konfiguration der Fernbedienung.
+#define REMOTE_PIN      6
+
+#define REMOTE_1        0xFF30CF
+#define REMOTE_2        0xFF18E7
+#define REMOTE_3        0xFF7A85
+#define REMOTE_4        0xFF10EF
+#define REMOTE_5        0xFF38C7
+#define REMOTE_6        0xFF5AA5
+
+IRrecv irrecv(REMOTE_PIN);
 
 /*
     LED Anzeige.
@@ -271,20 +284,70 @@ void processTag() {
     Helligkeit im Schlafmodus.
 */
 
+auto sleep_red = 0;
+auto sleep_blue = 0;
+auto sleep_green = 1;
+
 void sleep() {
     // Nicht unsere Aufgabe.
     if (ledMode != LED_OFF)
         return;
 
     // Auslesen.
-    auto intens = analogRead(POTI_PIN) / 4;
+    auto intens = 4 * (analogRead(POTI_PIN) / 16);
+
+    // Fernbedienung auslesen.
+    decode_results results;
 
     // Keine Änderung.
-    if (intens == lastPoti)
+    if (irrecv.decode(&results))
+    {
+        // Fernbedienung auswerten.
+        switch (results.value)
+        {
+        case REMOTE_1:
+            sleep_red = 1;
+            sleep_blue = 0;
+            sleep_green = 0;
+            break;
+        case REMOTE_2:
+            sleep_red = 0;
+            sleep_blue = 1;
+            sleep_green = 0;
+            break;
+        case REMOTE_3:
+            sleep_red = 0;
+            sleep_blue = 0;
+            sleep_green = 1;
+            break;
+        case REMOTE_4:
+            sleep_red = 0;
+            sleep_blue = 1;
+            sleep_green = 1;
+            break;
+        case REMOTE_5:
+            sleep_red = 1;
+            sleep_blue = 0;
+            sleep_green = 1;
+            break;
+        case REMOTE_6:
+            sleep_red = 1;
+            sleep_blue = 1;
+            sleep_green = 0;
+            break;
+        }
+
+        // Weiter machen.
+        irrecv.resume();
+    }
+    else if (intens == lastPoti)
         return;
 
-    // Merken und anzeigen.
-    singleColor(0, lastPoti = intens, 0);
+    // Merken.
+    lastPoti = intens;
+
+    // Anzeigen.
+    singleColor(sleep_red * lastPoti, sleep_green * lastPoti, sleep_blue * lastPoti);
 }
 
 /*
@@ -303,6 +366,9 @@ void setup() {
 
     // Bewegungsmelder initialisieren.
     pinMode(MOVE_PIN, INPUT);
+
+    // Fernbedienung initialisieren.
+    irrecv.enableIRIn();
 
     // Initiale Anzeige setzen.
     setDisplay(LED_OFF, true);
