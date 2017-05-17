@@ -21,6 +21,9 @@ MFRC522 mfrc522(RFID_SDA, RFID_RST);
 // Konfiguration des Bewegungsmelders.
 #define MOVE_PIN        7
 
+// Konfiguration der Helligkeitssteuerung.
+#define POTI_PIN        A0
+
 /*
     LED Anzeige.
 */
@@ -37,6 +40,7 @@ ledDisplayMode ledMode = LED_OFF;
 
 long ledHot = -1;
 long badAuth = -1;
+auto lastPoti = -1;
 long ledStart = -1;
 auto lastDynamic = -1;
 auto hasBadAuth = false;
@@ -65,7 +69,7 @@ void setDisplay(ledDisplayMode mode, bool force = false) {
     switch (ledMode = mode)
     {
     case LED_OFF:
-        singleColor(0, 4, 0);
+        lastPoti = -1;
         break;
     case LED_START_ON:
         singleColor(0, 128, 0);
@@ -264,6 +268,26 @@ void processTag() {
 }
 
 /*
+    Helligkeit im Schlafmodus.
+*/
+
+void sleep() {
+    // Nicht unsere Aufgabe.
+    if (ledMode != LED_OFF)
+        return;
+
+    // Auslesen.
+    auto intens = analogRead(POTI_PIN) / 4;
+
+    // Keine Änderung.
+    if (intens == lastPoti)
+        return;
+
+    // Merken und anzeigen.
+    singleColor(0, lastPoti = intens, 0);
+}
+
+/*
     Steuerung.
 */
 
@@ -310,6 +334,7 @@ void loop() {
             setDisplay(LED_WARN);
 
     // Wechselnde Anzeigen darstellen.
+    sleep();
     blinkStart();
     glow();
     rotate();
