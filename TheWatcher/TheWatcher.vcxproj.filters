@@ -13,6 +13,9 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Bilder">
+      <UniqueIdentifier>{d2d194ab-2c8f-4098-9430-8cef8b5e1e40}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <None Include="TheWatcher.ino" />
@@ -21,5 +24,10 @@
     <ClInclude Include="__vm\.TheWatcher.vsarduino.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="Images\01 Kabelsalat.jpg">
+      <Filter>Bilder</Filter>
+    </Image>
   </ItemGroup>
 </Project>

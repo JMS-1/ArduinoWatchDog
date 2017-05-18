@@ -45,24 +45,27 @@ typedef enum { LED_OFF, LED_START_ON, LED_START_OFF, LED_HOT, LED_WARN, LED_DETE
 
 ledDisplayMode ledMode = LED_OFF;
 
-#define START_ON    500
-#define START_OFF   200
-#define START_DELAY 5000
-#define AUTH_ON     2500
-#define WARN_ON     10000
+#define START_ON    500         // Startwarnung: Zeit für LEDs an
+#define START_OFF   200         // Startwarnung: Zeit für LEDs aus
+#define START_DELAY 5000        // Dauer der Startwarnung
+#define AUTH_ON     2500        // Dauer des Feedbacks für eine unbekannte RFID
+#define WARN_ON     10000       // Zeitraum zum Abschalten des Alarms (ok, hier nicht wirklich spannend, danach könnte es aber losheulen!)
+#define LATENCY     5000        // Solange müssen wir nach dem Abschalten warten, bis wir wieder scharf schalten können
 
-long ledHot = -1;
-long badAuth = -1;
-auto lastPoti = -1;
-long ledStart = -1;
-auto lastDynamic = -1;
-auto hasBadAuth = false;
+long ledHot = -1;               // Ende der Startwarnung
+long badAuth = -1;              // Ende des Feedbacks zu einer falschen RFID              
+auto lastPoti = -1;             // Letzte Einstellung der Helligkeitsregelung
+long ledStart = -1;             // Letzter Umschaltzeitpunkt der LED Anzeige
+auto lastDynamic = -1;          // Referenz für veränderliche Anzeigen (Rotation, Glühen)
+auto hasBadAuth = false;        // Gesetzt, wenn eine falsche RFID erkannt wurde
 
 // Einfarbige Anzeige.
 void singleColor(uint8_t r, uint8_t g, uint8_t b) {
+    auto color = leds.Color(r, g, b);
+
     // Ring in der gewünschten Farbe vorbereiten.
     for (auto i = 0; i < LED_COUNT; i++)
-        leds.setPixelColor(i, leds.Color(r, g, b));
+        leds.setPixelColor(i, color);
 
     // LED Ring anzeigen.
     leds.show();
@@ -75,7 +78,7 @@ void setDisplay(ledDisplayMode mode, bool force = false) {
     if ((mode == ledMode) && !force)
         return;
 
-    // Einige Anzeigen blinken.
+    // Einige Anzeigen verändern sich mit der Zeit, wir mekren uns daher den Umschaltzeitpunkt als Referenz.
     ledStart = millis();
 
     // Änderung merken und umsetzen.
@@ -122,10 +125,9 @@ void blinkStart() {
     }
 }
 
-// Bearbeitet die Anzeige der Meldung.
-
+// Zeigt einen Einbruch an (nein, heult nicht los).
 void rotate() {
-    // Das sind wir nicht
+    // Das sind wir nicht.
     if (ledMode != LED_DETECTED)
         return;
 
@@ -177,6 +179,7 @@ void rotate() {
     leds.show();
 }
 
+// Zeigt einen Einruch an, erlaubt aber noch das Abschalten des Alarms.
 void glow() {
     // Das sind wir nicht
     if (ledMode != LED_WARN)
@@ -186,7 +189,7 @@ void glow() {
     auto now = millis();
     auto done = now - ledStart;
 
-    // Anzeigen
+    // Anzeigen - wir machen uns hier nicht die Mühe einer Optimierung.
     if (done >= WARN_ON)
         setDisplay(LED_DETECTED);
     else
@@ -245,6 +248,7 @@ rfidTagResult readTag() {
     return RFID_GOODTAG;
 }
 
+// Prüft auf eine RFID Anmeldung.
 void processTag() {
     // Neu einlesen.
     auto tagInfo = readTag();
@@ -253,14 +257,20 @@ void processTag() {
         return;
 
     // Ergebnis auswerten.
+    auto now = millis();
+
     switch (lastTag = tagInfo)
     {
     case RFID_GOODTAG:
         switch (ledMode)
         {
         case LED_OFF:
+            // Das war zu schnell.   
+            if ((now - ledStart) < LATENCY)
+                return;
+
             // Startwarnung anwerfen.
-            ledHot = millis() + START_DELAY;
+            ledHot = now + START_DELAY;
             setDisplay(LED_START_ON);
             break;
         case LED_START_ON:
@@ -275,7 +285,7 @@ void processTag() {
     case RFID_BADTAG:
         // Falsches Tag melden.
         hasBadAuth = true;
-        badAuth = millis() + AUTH_ON;
+        badAuth = now + AUTH_ON;
         break;
     }
 }
@@ -284,10 +294,12 @@ void processTag() {
     Helligkeit im Schlafmodus.
 */
 
+// Viel können wir mit der Fernbedienung nicht machen, aber die Idee kommt sicher rüber.
 auto sleep_red = 0;
 auto sleep_blue = 0;
 auto sleep_green = 1;
 
+// Anzeige im Schlafzustand - sowohl die Helligkeitsregelung als auch die Fernbedienung haben hier einen Einfluss.
 void sleep() {
     // Nicht unsere Aufgabe.
     if (ledMode != LED_OFF)
