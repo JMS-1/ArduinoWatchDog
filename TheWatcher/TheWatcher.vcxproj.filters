@@ -29,5 +29,17 @@
     <Image Include="Images\01 Kabelsalat.jpg">
       <Filter>Bilder</Filter>
     </Image>
+    <Image Include="Images\02 Skizze Gehäuse.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="Images\03 Gehäuseteile.jpg">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="Images\04 Rohbau.jpg">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="Images\05 Verputzt.jpg">
+      <Filter>Resource Files</Filter>
+    </Image>
   </ItemGroup>
 </Project>

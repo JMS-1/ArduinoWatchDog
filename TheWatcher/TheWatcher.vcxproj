@@ -90,6 +90,10 @@
   </ItemGroup>
   <ItemGroup>
     <Image Include="Images\01 Kabelsalat.jpg" />
+    <Image Include="Images\02 Skizze Gehäuse.png" />
+    <Image Include="Images\03 Gehäuseteile.jpg" />
+    <Image Include="Images\04 Rohbau.jpg" />
+    <Image Include="Images\05 Verputzt.jpg" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
