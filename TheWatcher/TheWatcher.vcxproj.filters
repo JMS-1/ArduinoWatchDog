@@ -41,5 +41,8 @@
     <Image Include="Images\05 Verputzt.jpg">
       <Filter>Resource Files</Filter>
     </Image>
+    <Image Include="Images\06 Wieder Kabelsalat.jpg">
+      <Filter>Resource Files</Filter>
+    </Image>
   </ItemGroup>
 </Project>
