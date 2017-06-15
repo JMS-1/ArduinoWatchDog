@@ -44,5 +44,17 @@
     <Image Include="Images\06 Wieder Kabelsalat.jpg">
       <Filter>Resource Files</Filter>
     </Image>
+    <Image Include="Images\07 Fertig 1.jpg">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="Images\08 Fertig 2.jpg">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="Images\09 Fertig 3.jpg">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="Images\10 Einbauposition.jpg">
+      <Filter>Resource Files</Filter>
+    </Image>
   </ItemGroup>
 </Project>
